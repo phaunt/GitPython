@@ -846,10 +846,19 @@ class IterableList(list):
     can be left out."""
     __slots__ = ('_id_attr', '_prefix')
 
+    def _find_attr(self, attr):
+        attr = self._prefix + attr
+        for item in self:
+            if getattr(item, self._id_attr) == attr:
+                return item
+        # END for each item
+        return None
+
     def __new__(cls, id_attr, prefix=''):
         return super(IterableList, cls).__new__(cls)
 
     def __init__(self, id_attr, prefix=''):
+        # LP FIXME should we call super().__init__()?
         self._id_attr = id_attr
         self._prefix = prefix
 
@@ -864,30 +873,23 @@ class IterableList(list):
         # END handle match
 
         # otherwise make a full name search
-        try:
-            getattr(self, attr)
-            return True
-        except (AttributeError, TypeError):
-            return False
+        return self._find_attr(attr) is not None
         # END handle membership
 
     def __getattr__(self, attr):
-        attr = self._prefix + attr
-        for item in self:
-            if getattr(item, self._id_attr) == attr:
-                return item
-        # END for each item
+        item = self._find_attr(attr)
+        if item is not None:
+            return item
         return list.__getattribute__(self, attr)
 
     def __getitem__(self, index):
         if isinstance(index, int):
             return list.__getitem__(self, index)
 
-        try:
-            return getattr(self, index)
-        except AttributeError:
-            raise IndexError("No item found with id %r" % (self._prefix + index))
-        # END handle getattr
+        item = self._find_attr(index)
+        if item is not None:
+            return item
+        raise IndexError("No item found with id %r" % (self._prefix + index))
 
     def __delitem__(self, index):
         delindex = index
